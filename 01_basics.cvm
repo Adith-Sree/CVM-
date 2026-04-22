@@ -1,0 +1,46 @@
+# ══════════════════════════════════════════════
+#  CVM++ Demo: Hello World & Basics
+# ══════════════════════════════════════════════
+
+print("═══════════════════════════════")
+print("  CVM++ Hello World Demo")
+print("═══════════════════════════════")
+
+# ── Variables & Types ──────────────────────
+let name = "CVM++"
+let version = 1
+let pi = 3.14159
+let active = true
+
+print("Name    : " + name)
+print("Version : " + str(version))
+print("Pi      : " + str(pi))
+print("Active  : " + str(active))
+
+# ── Arithmetic ─────────────────────────────
+print("\n── Arithmetic ──")
+let a = 15
+let b = 4
+
+print("a = " + str(a) + ", b = " + str(b))
+print("a + b = " + str(a + b))
+print("a - b = " + str(a - b))
+print("a * b = " + str(a * b))
+print("a / b = " + str(a / b))
+print("a % b = " + str(a % b))
+
+# ── Comparison ─────────────────────────────
+print("\n── Comparisons ──")
+print("a > b  : " + str(a > b))
+print("a == b : " + str(a == b))
+print("a != b : " + str(a != b))
+print("a <= 15: " + str(a <= 15))
+
+# ── String operations ──────────────────────
+print("\n── Strings ──")
+let greeting = "Hello" + ", " + "World!"
+print(greeting)
+print("Length: " + str(len(greeting)))
+print("Repeat: " + "Ha" * 3)
+
+print("\nDone!")

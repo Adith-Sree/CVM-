@@ -1,0 +1,69 @@
+# ══════════════════════════════════════════════
+#  CVM++ Demo: Control Flow
+# ══════════════════════════════════════════════
+
+print("── If/Else ──")
+
+let score = 85
+
+if (score >= 90) {
+    print("Grade: A")
+} else {
+    if (score >= 80) {
+        print("Grade: B")
+    } else {
+        if (score >= 70) {
+            print("Grade: C")
+        } else {
+            print("Grade: F")
+        }
+    }
+}
+
+# ── While loop ─────────────────────────────
+print("\n── While Loop (FizzBuzz 1..15) ──")
+let i = 1
+while (i <= 15) {
+    if (i % 15 == 0) {
+        print("FizzBuzz")
+    } else {
+        if (i % 3 == 0) {
+            print("Fizz")
+        } else {
+            if (i % 5 == 0) {
+                print("Buzz")
+            } else {
+                print(i)
+            }
+        }
+    }
+    i += 1
+}
+
+# ── For loop ───────────────────────────────
+print("\n── For Loop (Sum 1..100) ──")
+let sum = 0
+for (let j = 1; j <= 100; j = j + 1) {
+    sum += j
+}
+print("Sum 1..100 = " + str(sum))
+
+# ── Break & Continue ───────────────────────
+print("\n── Break & Continue ──")
+print("Even numbers < 10:")
+let k = 0
+while (k < 10) {
+    k += 1
+    if (k % 2 != 0) { continue }
+    print(k)
+}
+
+print("First multiple of 7 > 50:")
+let n = 50
+while (true) {
+    n += 1
+    if (n % 7 == 0) {
+        print(n)
+        break
+    }
+}

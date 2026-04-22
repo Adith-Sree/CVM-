@@ -1,0 +1,73 @@
+# ══════════════════════════════════════════════
+#  CVM++ Demo: Standard Library Showcase
+# ══════════════════════════════════════════════
+
+print("── Math Functions ──")
+print("sqrt(49)     = " + str(sqrt(49.0)))
+print("abs(-42)     = " + str(abs(-42)))
+print("abs(3.14)    = " + str(abs(3.14)))
+print("pow(2, 10)   = " + str(pow(2.0, 10.0)))
+print("floor(3.9)   = " + str(floor(3.9)))
+print("ceil(3.1)    = " + str(ceil(3.1)))
+print("round(3.5)   = " + str(round(3.5)))
+print("max(10, 20)  = " + str(max(10, 20)))
+print("min(10, 20)  = " + str(min(10, 20)))
+
+print("\n── Type Functions ──")
+print("type(42)     = " + type(42))
+print("type(3.14)   = " + type(3.14))
+print("type(true)   = " + type(true))
+print("type(\"hi\")   = " + type("hi"))
+print("type(nil)    = " + type(nil))
+
+print("\n── Conversions ──")
+print("str(42)      = " + str(42))
+print("str(3.14)    = " + str(3.14))
+print("str(true)    = " + str(true))
+print("int(\"123\")   = " + str(int("123")))
+print("float(\"3.5\") = " + str(float("3.5")))
+print("int(9.9)     = " + str(int(9.9)))
+print("bool(0)      = " + str(bool(0)))
+print("bool(1)      = " + str(bool(1)))
+print("bool(\"\")     = " + str(bool("")))
+print("bool(\"hi\")   = " + str(bool("hi")))
+
+print("\n── String Functions ──")
+let s = "Hello, CVM++!"
+print("String: '" + s + "'")
+print("len:    " + str(len(s)))
+
+# ── Numeric algorithms using stdlib ─────────
+print("\n── Math-Heavy Demo ──")
+
+# Sum of squares
+let total = 0
+for (let i = 1; i <= 10; i = i + 1) {
+    total += int(pow(float(i), 2.0))
+}
+print("Sum of squares 1..10 = " + str(total))
+
+# Geometric mean of 1..5
+# geometric_mean = (1*2*3*4*5)^(1/5)
+let product = 1.0
+for (let i = 1; i <= 5; i = i + 1) {
+    product = product * float(i)
+}
+let geo_mean = pow(product, 1.0 / 5.0)
+print("Geometric mean 1..5  = " + str(geo_mean))
+
+# ── Recursion + stdlib ──────────────────────
+fn digit_sum(n) {
+    if (n < 0) { n = abs(n) }
+    let s = 0
+    while (n > 0) {
+        s += n % 10
+        n = n / 10
+    }
+    return s
+}
+
+print("\n── Digit Sum Demo ──")
+print("digit_sum(12345)  = " + str(digit_sum(12345)))
+print("digit_sum(99999)  = " + str(digit_sum(99999)))
+print("digit_sum(100000) = " + str(digit_sum(100000)))

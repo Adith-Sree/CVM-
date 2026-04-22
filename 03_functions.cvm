@@ -1,0 +1,92 @@
+# ══════════════════════════════════════════════
+#  CVM++ Demo: Functions & Recursion
+# ══════════════════════════════════════════════
+
+# ── Basic function ──────────────────────────
+fn greet(name) {
+    return "Hello, " + name + "!"
+}
+print(greet("World"))
+print(greet("CVM++"))
+
+# ── Fibonacci (recursive) ───────────────────
+fn fib(n) {
+    if (n <= 1) { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+
+print("\n── Fibonacci Sequence ──")
+for (let i = 0; i <= 10; i = i + 1) {
+    print("fib(" + str(i) + ") = " + str(fib(i)))
+}
+
+# ── Factorial ───────────────────────────────
+fn factorial(n) {
+    if (n <= 1) { return 1 }
+    return n * factorial(n - 1)
+}
+
+print("\n── Factorials ──")
+for (let i = 0; i <= 10; i = i + 1) {
+    print(str(i) + "! = " + str(factorial(i)))
+}
+
+# ── Power function ──────────────────────────
+fn my_pow(base, exp) {
+    if (exp == 0) { return 1 }
+    let result = 1
+    let e = exp
+    while (e > 0) {
+        result = result * base
+        e -= 1
+    }
+    return result
+}
+
+print("\n── Powers of 2 ──")
+for (let i = 0; i <= 12; i = i + 1) {
+    print("2^" + str(i) + " = " + str(my_pow(2, i)))
+}
+
+# ── Higher-order via explicit passing ───────
+fn apply_twice(x, fn_name) {
+    # CVM++ doesn't have closures yet, so we simulate
+    if (fn_name == "double") { return x * 2 * 2 }
+    if (fn_name == "inc")    { return x + 1 + 1 }
+    return x
+}
+
+print("\n── Apply Twice ──")
+print("apply_twice(5, double) = " + str(apply_twice(5, "double")))
+print("apply_twice(5, inc)    = " + str(apply_twice(5, "inc")))
+
+# ── GCD (Euclid's algorithm) ────────────────
+fn gcd(a, b) {
+    while (b != 0) {
+        let t = b
+        b = a % b
+        a = t
+    }
+    return a
+}
+
+print("\n── GCD Examples ──")
+print("gcd(48, 18) = " + str(gcd(48, 18)))
+print("gcd(100, 75) = " + str(gcd(100, 75)))
+print("gcd(252, 105) = " + str(gcd(252, 105)))
+
+# ── Mutual recursion ────────────────────────
+fn is_even(n) {
+    if (n == 0) { return true }
+    return is_odd(n - 1)
+}
+
+fn is_odd(n) {
+    if (n == 0) { return false }
+    return is_even(n - 1)
+}
+
+print("\n── Mutual Recursion (Even/Odd) ──")
+print("is_even(4) = " + str(is_even(4)))
+print("is_odd(7)  = " + str(is_odd(7)))
+print("is_even(9) = " + str(is_even(9)))

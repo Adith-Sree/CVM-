@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CVM++ — Stack-Based VM & Compiler</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg:      #0a0c10;
+    --surface: #10141c;
+    --card:    #141920;
+    --border:  #1e2535;
+    --border2: #2a3548;
+    --accent:  #00d9ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --warn:    #f59e0b;
+    --err:     #ef4444;
+    --text:    #e2e8f0;
+    --muted:   #64748b;
+    --dim:     #334155;
+    --tok-kw:  #c084fc;
+    --tok-num: #34d399;
+    --tok-str: #fbbf24;
+    --tok-op:  #60a5fa;
+    --tok-id:  #e2e8f0;
+    --tok-cmt: #4b5563;
+    --tok-fn:  #f472b6;
+    --tok-bi:  #22d3ee;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo-text span { color: var(--accent); }
+  .logo-sub {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+  .badge-cyan  { background: rgba(0,217,255,.15); color: var(--accent); border: 1px solid rgba(0,217,255,.3); }
+  .badge-green { background: rgba(16,185,129,.15); color: var(--accent3); border: 1px solid rgba(16,185,129,.3); }
+  .badge-purple{ background: rgba(124,58,237,.15); color: #a78bfa; border: 1px solid rgba(124,58,237,.3); }
+
+  /* ── Layout ── */
+  .workspace {
+    display: grid;
+    grid-template-columns: 260px 1fr 340px;
+    grid-template-rows: calc(100vh - 56px);
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-title {
+    padding: 0 16px 8px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--muted);
+    transition: all .15s;
+    border-left: 2px solid transparent;
+  }
+  .file-item:hover { background: rgba(255,255,255,.04); color: var(--text); }
+  .file-item.active {
+    background: rgba(0,217,255,.08);
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+  .file-icon { font-size: 13px; opacity: .7; }
+
+  .isa-list {
+    padding: 0 12px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .isa-group { margin-bottom: 12px; }
+  .isa-group-title {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--dim);
+    padding: 4px 4px 6px;
+    font-weight: 700;
+  }
+  .isa-op {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 4px;
+    border-radius: 4px;
+    font-size: 11px;
+    transition: background .1s;
+  }
+  .isa-op:hover { background: rgba(255,255,255,.04); }
+  .isa-op-name { color: var(--accent); font-weight: 500; }
+  .isa-op-desc { color: var(--muted); font-size: 10px; }
+
+  /* ── Editor area ── */
+  .editor-pane {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--card);
+  }
+
+  .editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all .15s;
+  }
+  .btn-run {
+    background: linear-gradient(135deg, var(--accent3), #059669);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(16,185,129,.3);
+  }
+  .btn-run:hover { transform: translateY(-1px); box-shadow: 0 4px 24px rgba(16,185,129,.4); }
+  .btn-run:active { transform: translateY(0); }
+  .btn-clear {
+    background: rgba(255,255,255,.06);
+    color: var(--muted);
+    border: 1px solid var(--border2);
+  }
+  .btn-clear:hover { color: var(--text); background: rgba(255,255,255,.1); }
+  .btn-icon { font-size: 14px; }
+
+  .tab-bar {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all .15s;
+    border-right: 1px solid var(--border);
+  }
+  .tab:hover { color: var(--text); background: rgba(255,255,255,.03); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--card); }
+  .tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent3); }
+
+  .editor-scroll {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+
+  .editor-inner {
+    display: flex;
+    min-height: 100%;
+  }
+
+  .line-numbers {
+    padding: 16px 12px 16px 16px;
+    text-align: right;
+    user-select: none;
+    color: var(--dim);
+    font-size: 13px;
+    line-height: 1.7;
+    min-width: 48px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    left: 0;
+  }
+
+  .editor-code {
+    flex: 1;
+    padding: 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    outline: none;
+    resize: none;
+    border: none;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--accent);
+    white-space: pre;
+    tab-size: 4;
+    font-family: 'JetBrains Mono', monospace;
+    position: absolute;
+    top: 0; left: 48px; right: 0; bottom: 0;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .highlight-layer {
+    padding: 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    white-space: pre;
+    pointer-events: none;
+    position: absolute;
+    top: 0; left: 48px; right: 0;
+    font-family: 'JetBrains Mono', monospace;
+    z-index: 0;
+  }
+
+  /* ── Right panel ── */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: .5px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .15s;
+  }
+  .panel-tab:hover { color: var(--text); }
+  .panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    display: none;
+    flex-direction: column;
+  }
+  .panel-content.active { display: flex; }
+
+  /* Output terminal */
+  .terminal {
+    flex: 1;
+    padding: 16px;
+    font-size: 12px;
+    line-height: 1.8;
+    overflow-y: auto;
+  }
+  .terminal-line { display: flex; gap: 8px; align-items: flex-start; }
+  .terminal-prompt { color: var(--dim); user-select: none; }
+  .out-normal { color: var(--accent3); }
+  .out-error  { color: var(--err); }
+  .out-info   { color: var(--accent); }
+  .out-warn   { color: var(--warn); }
+  .out-dim    { color: var(--muted); }
+
+  /* Stack visualizer */
+  .stack-viz {
+    padding: 16px;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .stack-frame {
+    margin-bottom: 16px;
+  }
+  .stack-frame-title {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stack-frame-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .stack-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    margin-bottom: 3px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    transition: all .2s;
+    animation: slideIn .2s ease;
+  }
+  @keyframes slideIn {
+    from { transform: translateX(-8px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  .stack-idx { color: var(--dim); font-size: 10px; min-width: 24px; }
+  .stack-type { 
+    font-size: 10px; padding: 1px 6px; border-radius: 3px;
+    min-width: 44px; text-align: center; font-weight: 600;
+  }
+  .type-int    { background: rgba(52,211,153,.15); color: #34d399; }
+  .type-float  { background: rgba(96,165,250,.15); color: #60a5fa; }
+  .type-bool   { background: rgba(192,132,252,.15); color: #c084fc; }
+  .type-string { background: rgba(251,191,36,.15); color: #fbbf24; }
+  .type-nil    { background: rgba(100,116,139,.15); color: #64748b; }
+  .type-fn     { background: rgba(244,114,182,.15); color: #f472b6; }
+  .stack-val { color: var(--text); font-weight: 500; }
+  .stack-empty { color: var(--dim); font-size: 12px; text-align: center; padding: 24px; }
+
+  /* AST view */
+  .ast-view {
+    padding: 16px;
+    font-size: 11px;
+    line-height: 1.8;
+    color: var(--muted);
+    flex: 1;
+    overflow-y: auto;
+  }
+  .ast-node { cursor: default; }
+  .ast-node:hover { color: var(--text); }
+  .ast-kw { color: var(--tok-kw); }
+  .ast-ident { color: var(--accent); }
+  .ast-val { color: var(--tok-str); }
+
+  /* Bytecode view */
+  .bytecode-view {
+    padding: 12px 16px;
+    font-size: 11px;
+    line-height: 1.8;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .bc-line {
+    display: flex;
+    gap: 8px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: background .1s;
+  }
+  .bc-line:hover { background: rgba(255,255,255,.04); }
+  .bc-offset { color: var(--dim); min-width: 52px; font-size: 10px; }
+  .bc-line-num { color: var(--dim); min-width: 36px; font-size: 10px; }
+  .bc-op { color: var(--accent); min-width: 120px; font-weight: 500; }
+  .bc-arg { color: var(--tok-str); }
+  .bc-section {
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 4px 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+
+  /* Stats panel */
+  .stats-panel {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 24px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stat-unit { font-size: 12px; color: var(--muted); margin-left: 4px; }
+
+  .progress-bar-wrap { margin-top: 8px; }
+  .progress-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width .5s ease;
+  }
+
+  /* Syntax highlighting */
+  .kw   { color: var(--tok-kw); font-weight: 500; }
+  .num  { color: var(--tok-num); }
+  .str  { color: var(--tok-str); }
+  .op   { color: var(--tok-op); }
+  .cmt  { color: var(--tok-cmt); font-style: italic; }
+  .fn-name { color: var(--tok-fn); }
+  .builtin { color: var(--tok-bi); }
+  .ident { color: var(--tok-id); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+  /* Status bar */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 4px 16px;
+    background: var(--accent2);
+    font-size: 11px;
+    color: rgba(255,255,255,.7);
+    grid-column: 1 / -1;
+  }
+  .status-item { display: flex; align-items: center; gap: 4px; }
+  .status-ok   { color: var(--accent3); }
+  .status-err  { color: #fca5a5; }
+
+  /* Glow effects */
+  .glow-cyan   { text-shadow: 0 0 20px rgba(0,217,255,.5); }
+  .glow-green  { text-shadow: 0 0 20px rgba(16,185,129,.5); }
+
+  /* Running animation */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
+  }
+  .running { animation: pulse .8s infinite; }
+
+  /* Tooltip */
+  [title] { cursor: help; }
+
+  /* Responsive hide */
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: 1fr 280px; }
+    .sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-text">CVM<span>++</span></div>
+      <div class="logo-sub">Stack-Based VM & Compiler</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="badge badge-cyan">C++17</span>
+    <span class="badge badge-green">55/55 Tests ✓</span>
+    <span class="badge badge-purple">v1.0.0</span>
+  </div>
+</header>
+
+<div style="display:grid; grid-template-rows: 1fr auto;">
+<div class="workspace">
+
+  <!-- Left sidebar: ISA reference -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Script Files</div>
+      <div class="file-item active" onclick="loadScript('basics')">
+        <span class="file-icon">📄</span> 01_basics.cvm
+      </div>
+      <div class="file-item" onclick="loadScript('control')">
+        <span class="file-icon">📄</span> 02_control_flow.cvm
+      </div>
+      <div class="file-item" onclick="loadScript('functions')">
+        <span class="file-icon">📄</span> 03_functions.cvm
+      </div>
+      <div class="file-item" onclick="loadScript('algorithms')">
+        <span class="file-icon">📄</span> 04_algorithms.cvm
+      </div>
+      <div class="file-item" onclick="loadScript('stdlib')">
+        <span class="file-icon">📄</span> 05_stdlib.cvm
+      </div>
+    </div>
+    <div class="sidebar-section" style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+      <div class="sidebar-title">ISA Reference</div>
+      <div class="isa-list">
+        <div class="isa-group">
+          <div class="isa-group-title">Stack</div>
+          <div class="isa-op"><span class="isa-op-name">PUSH_INT</span><span class="isa-op-desc">8B i64</span></div>
+          <div class="isa-op"><span class="isa-op-name">PUSH_FLOAT</span><span class="isa-op-desc">8B f64</span></div>
+          <div class="isa-op"><span class="isa-op-name">PUSH_BOOL</span><span class="isa-op-desc">1B</span></div>
+          <div class="isa-op"><span class="isa-op-name">PUSH_STRING</span><span class="isa-op-desc">2B idx</span></div>
+          <div class="isa-op"><span class="isa-op-name">PUSH_NIL</span><span class="isa-op-desc">—</span></div>
+          <div class="isa-op"><span class="isa-op-name">POP</span><span class="isa-op-desc">—</span></div>
+        </div>
+        <div class="isa-group">
+          <div class="isa-group-title">Arithmetic</div>
+          <div class="isa-op"><span class="isa-op-name">ADD</span><span class="isa-op-desc">a+b</span></div>
+          <div class="isa-op"><span class="isa-op-name">SUB</span><span class="isa-op-desc">a-b</span></div>
+          <div class="isa-op"><span class="isa-op-name">MUL</span><span class="isa-op-desc">a*b</span></div>
+          <div class="isa-op"><span class="isa-op-name">DIV</span><span class="isa-op-desc">a/b</span></div>
+          <div class="isa-op"><span class="isa-op-name">MOD</span><span class="isa-op-desc">a%b</span></div>
+          <div class="isa-op"><span class="isa-op-name">NEG</span><span class="isa-op-desc">-a</span></div>
+        </div>
+        <div class="isa-group">
+          <div class="isa-group-title">Comparison</div>
+          <div class="isa-op"><span class="isa-op-name">EQ NEQ</span><span class="isa-op-desc">==  !=</span></div>
+          <div class="isa-op"><span class="isa-op-name">LT GT</span><span class="isa-op-desc">&lt;  &gt;</span></div>
+          <div class="isa-op"><span class="isa-op-name">LTE GTE</span><span class="isa-op-desc">&lt;= &gt;=</span></div>
+        </div>
+        <div class="isa-group">
+          <div class="isa-group-title">Logic</div>
+          <div class="isa-op"><span class="isa-op-name">AND OR NOT</span><span class="isa-op-desc">short-circuit</span></div>
+        </div>
+        <div class="isa-group">
+          <div class="isa-group-title">Variables</div>
+          <div class="isa-op"><span class="isa-op-name">DEFINE_VAR</span><span class="isa-op-desc">2B slot</span></div>
+          <div class="isa-op"><span class="isa-op-name">LOAD_VAR</span><span class="isa-op-desc">2B slot</span></div>
+          <div class="isa-op"><span class="isa-op-name">STORE_VAR</span><span class="isa-op-desc">2B slot</span></div>
+          <div class="isa-op"><span class="isa-op-name">LOAD_GLOBAL</span><span class="isa-op-desc">2B idx</span></div>
+          <div class="isa-op"><span class="isa-op-name">STORE_GLOBAL</span><span class="isa-op-desc">2B idx</span></div>
+        </div>
+        <div class="isa-group">
+          <div class="isa-group-title">Control</div>
+          <div class="isa-op"><span class="isa-op-name">JUMP</span><span class="isa-op-desc">4B target</span></div>
+          <div class="isa-op"><span class="isa-op-name">JUMP_IF_FALSE</span><span class="isa-op-desc">peek</span></div>
+          <div class="isa-op"><span class="isa-op-name">JUMP_IF_TRUE</span><span class="isa-op-desc">peek</span></div>
+        </div>
+        <div class="isa-group">
+          <div class="isa-group-title">Functions</div>
+          <div class="isa-op"><span class="isa-op-name">MAKE_FUNC</span><span class="isa-op-desc">2B idx</span></div>
+          <div class="isa-op"><span class="isa-op-name">CALL</span><span class="isa-op-desc">1B argc</span></div>
+          <div class="isa-op"><span class="isa-op-name">RETURN</span><span class="isa-op-desc">—</span></div>
+          <div class="isa-op"><span class="isa-op-name">RETURN_NIL</span><span class="isa-op-desc">—</span></div>
+        </div>
+        <div class="isa-group">
+          <div class="isa-group-title">I/O & Misc</div>
+          <div class="isa-op"><span class="isa-op-name">PRINT</span><span class="isa-op-desc">—</span></div>
+          <div class="isa-op"><span class="isa-op-name">INPUT</span><span class="isa-op-desc">—</span></div>
+          <div class="isa-op"><span class="isa-op-name">STR_CONCAT</span><span class="isa-op-desc">—</span></div>
+          <div class="isa-op"><span class="isa-op-name">HALT</span><span class="isa-op-desc">—</span></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Editor pane -->
+  <main class="editor-pane">
+    <div class="editor-toolbar">
+      <button class="btn btn-run" onclick="runCode()" id="runBtn">
+        <span class="btn-icon">▶</span> Run
+      </button>
+      <button class="btn btn-clear" onclick="clearOutput()">
+        <span class="btn-icon">🗑</span> Clear
+      </button>
+      <div style="flex:1"></div>
+      <span style="font-size:11px; color:var(--muted)">CVM Script v1.0</span>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab active" id="tab-editor" onclick="switchEditorTab('editor')">
+        <div class="tab-dot"></div> editor.cvm
+      </div>
+    </div>
+
+    <div class="editor-scroll" id="editorScroll">
+      <div class="editor-inner">
+        <div class="line-numbers" id="lineNums">1</div>
+        <div style="position:relative; flex:1; min-height:100%;">
+          <div class="highlight-layer" id="highlight" aria-hidden="true"></div>
+          <textarea class="editor-code" id="editor"
+            spellcheck="false"
+            autocorrect="off"
+            autocapitalize="off"
+            placeholder="# Write CVM++ code here..."
+          ></textarea>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Right panel -->
+  <aside class="right-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchPanel('output')">Output</div>
+      <div class="panel-tab" onclick="switchPanel('stack')">Stack</div>
+      <div class="panel-tab" onclick="switchPanel('bytecode')">Bytecode</div>
+      <div class="panel-tab" onclick="switchPanel('stats')">Stats</div>
+    </div>
+
+    <!-- Output panel -->
+    <div class="panel-content active" id="panel-output">
+      <div class="terminal" id="terminal">
+        <div style="color:var(--muted); font-size:11px; padding-bottom:12px; border-bottom:1px solid var(--border); margin-bottom:12px;">
+          CVM++ Interactive Interpreter — Press ▶ Run to execute
+        </div>
+      </div>
+    </div>
+
+    <!-- Stack panel -->
+    <div class="panel-content" id="panel-stack">
+      <div class="stack-viz" id="stackViz">
+        <div class="stack-empty">Run code to see the execution stack</div>
+      </div>
+    </div>
+
+    <!-- Bytecode panel -->
+    <div class="panel-content" id="panel-bytecode">
+      <div class="bytecode-view" id="bytecodeView">
+        <div style="color:var(--muted); font-size:11px;">Run code to see compiled bytecode</div>
+      </div>
+    </div>
+
+    <!-- Stats panel -->
+    <div class="panel-content" id="panel-stats">
+      <div class="stats-panel" id="statsPanel">
+        <div class="stat-card">
+          <div class="stat-label">Instructions Executed</div>
+          <div class="stat-value" id="stat-instructions">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Stack Peak Depth</div>
+          <div class="stat-value" id="stat-stack">—</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar"><div class="progress-fill" id="stat-stack-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Function Calls</div>
+          <div class="stat-value" id="stat-calls">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Compile Time</div>
+          <div class="stat-value" id="stat-compile">—<span class="stat-unit">ms</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Execution Time</div>
+          <div class="stat-value" id="stat-exec">—<span class="stat-unit">ms</span></div>
+        </div>
+        <div class="stat-card" style="border-color:var(--accent2);">
+          <div class="stat-label">Tokens Lexed</div>
+          <div class="stat-value" id="stat-tokens" style="color:var(--accent2)">—</div>
+        </div>
+        <div class="stat-card" style="border-color:var(--accent3);">
+          <div class="stat-label">AST Nodes</div>
+          <div class="stat-value" id="stat-nodes" style="color:var(--accent3)">—</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+</div><!-- grid -->
+
+<script>
+// ─────────────────────────────────────────────
+//  CVM++ Interpreter (JavaScript port)
+// ─────────────────────────────────────────────
+
+// ── Token types ──────────────────────────────
+const TT = {
+  NUMBER:'NUMBER', FLOAT:'FLOAT', STRING:'STRING', TRUE:'TRUE', FALSE:'FALSE', NIL:'NIL',
+  IDENT:'IDENT',
+  LET:'let', IF:'if', ELSE:'else', WHILE:'while', FOR:'for', FN:'fn', RETURN:'return',
+  PRINT:'print', INPUT:'input', AND:'and', OR:'or', NOT:'not', BREAK:'break', CONTINUE:'continue',
+  PLUS:'+', MINUS:'-', STAR:'*', SLASH:'/', PERCENT:'%',
+  EQ:'==', NEQ:'!=', LT:'<', GT:'>', LTE:'<=', GTE:'>=',
+  ASSIGN:'=', PLUS_A:'+=', MINUS_A:'-=', STAR_A:'*=', SLASH_A:'/=',
+  INCR:'++', DECR:'--',
+  LPAREN:'(', RPAREN:')', LBRACE:'{', RBRACE:'}',
+  COMMA:',', SEMI:';', NL:'\n', EOF:'EOF',
+};
+
+const KEYWORDS = {
+  let:TT.LET, if:TT.IF, else:TT.ELSE, while:TT.WHILE, for:TT.FOR, fn:TT.FN,
+  return:TT.RETURN, print:TT.PRINT, input:TT.INPUT, true:TT.TRUE, false:TT.FALSE,
+  nil:TT.NIL, and:TT.AND, or:TT.OR, not:TT.NOT, break:TT.BREAK, continue:TT.CONTINUE,
+};
+
+const BUILTINS = new Set(['sqrt','abs','pow','floor','ceil','round','max','min',
+                          'str','int','float','bool','len','type','chr','ord']);
+
+// ── Lexer ─────────────────────────────────────
+function lex(src) {
+  const tokens = [];
+  let i = 0, line = 1, col = 1;
+
+  const peek = (o=0) => i+o < src.length ? src[i+o] : '\0';
+  const adv  = () => { const c=src[i++]; if(c==='\n'){line++;col=1;}else col++; return c; };
+  const match = c => { if(i<src.length&&src[i]===c){adv();return true;}return false; };
+
+  while (i < src.length) {
+    // skip whitespace (not newlines)
+    while (i<src.length && (src[i]===' '||src[i]==='\t'||src[i]==='\r')) adv();
+    if (i>=src.length) break;
+
+    const c = peek(), ln=line, cl=col;
+
+    // Comments
+    if (c==='#') { while(i<src.length&&src[i]!=='\n') adv(); continue; }
+    if (c==='/'&&peek(1)==='*') {
+      adv();adv();
+      while(i<src.length){if(src[i]==='*'&&peek(1)==='/'){adv();adv();break;}adv();}
+      continue;
+    }
+
+    // Newline
+    if (c==='\n') { adv(); tokens.push({t:TT.NL,v:'\\n',ln,cl}); continue; }
+
+    // Numbers
+    if (/\d/.test(c)) {
+      let n='', isF=false;
+      while(i<src.length&&(/\d/.test(src[i])||src[i]==='_')){if(src[i]!=='_')n+=adv();else adv();}
+      if(peek()==='.'&&/\d/.test(peek(1))){isF=true;n+=adv();while(i<src.length&&/\d/.test(src[i]))n+=adv();}
+      if(peek()==='e'||peek()==='E'){isF=true;n+=adv();if(peek()==='+'||peek()==='-')n+=adv();while(i<src.length&&/\d/.test(src[i]))n+=adv();}
+      tokens.push({t:isF?TT.FLOAT:TT.NUMBER,v:n,ln,cl});
+      continue;
+    }
+
+    // Strings
+    if (c==='"'||c==="'") {
+      const q=adv(); let s='';
+      while(i<src.length&&src[i]!==q){
+        const ch=adv();
+        if(ch==='\\'){const e=adv();s+=({'n':'\n','t':'\t','r':'\r','\\':'\\','"':'"',"'":'\''})[e]||e;}
+        else s+=ch;
+      }
+      if(i<src.length)adv();
+      tokens.push({t:TT.STRING,v:s,ln,cl});
+      continue;
+    }
+
+    // Identifiers / keywords
+    if (/[a-zA-Z_]/.test(c)) {
+      let id='';
+      while(i<src.length&&/[a-zA-Z0-9_]/.test(src[i]))id+=adv();
+      const kw=KEYWORDS[id];
+      tokens.push({t:kw||TT.IDENT,v:id,ln,cl});
+      continue;
+    }
+
+    adv();
+    switch(c){
+      case '+': tokens.push({t:match('+')&&'++' || match('=')&&'+=' || '+', v:src[i-1]==='='?'+=':src[i-1]==='+'?'++':'+',ln,cl}); break;
+      case '-': tokens.push({t:match('-')&&'--' || match('=')&&'-=' || '-', v:src[i-1]==='='?'-=':src[i-1]==='-'?'--':'-',ln,cl}); break;
+      case '*': tokens.push({t:match('=')&&'*=' || '*', v:match('=')===false&&src[i-1]==='='?'*=':'*',ln,cl}); break;
+      case '/': tokens.push({t:match('=')&&'/=' || '/', v:src[i-1]==='='?'/=':'/',ln,cl}); break;
+      case '%': tokens.push({t:'%',v:'%',ln,cl}); break;
+      case '=': tokens.push({t:match('=')&&'==' || '=', v:src[i-1]==='='?'==':'=',ln,cl}); break;
+      case '!': tokens.push({t:match('=')&&'!='||'!', v:'!=',ln,cl}); break;
+      case '<': tokens.push({t:match('=')&&'<='||'<', v:src[i-1]==='='?'<=':'<',ln,cl}); break;
+      case '>': tokens.push({t:match('=')&&'>='||'>', v:src[i-1]==='='?'>=':'>',ln,cl}); break;
+      case '(': tokens.push({t:'(',v:'(',ln,cl}); break;
+      case ')': tokens.push({t:')',v:')',ln,cl}); break;
+      case '{': tokens.push({t:'{',v:'{',ln,cl}); break;
+      case '}': tokens.push({t:'}',v:'}',ln,cl}); break;
+      case ',': tokens.push({t:',',v:',',ln,cl}); break;
+      case ';': tokens.push({t:';',v:';',ln,cl}); break;
+    }
+  }
+  tokens.push({t:TT.EOF,v:'',ln:line,cl:col});
+  return tokens;
+}
+
+// ── Simple CVM++ Interpreter ──────────────────
+// (Tree-walking interpreter for the web demo; the real compiler is in C++)
+class CVMInterpreter {
+  constructor(output_fn) {
+    this.out = output_fn;
+    this.globals = {};
+    this.stats = { instructions: 0, stack_peak: 0, calls: 0, tokens: 0, nodes: 0 };
+    this.fns = {};
+    this.stack_trace = [];
+    this.break_signal = false;
+    this.continue_signal = false;
+    this.return_val = null;
+    this.returning = false;
+    this.bytecode_log = [];
+    this.stack_log = [];
+  }
+
+  run(src) {
+    const t0 = performance.now();
+    const tokens = lex(src);
+    this.stats.tokens = tokens.filter(t => t.t !== TT.NL && t.t !== TT.EOF).length;
+    const t1 = performance.now();
+
+    let pos = 0;
+    const peek = (o=0) => tokens[Math.min(pos+o, tokens.length-1)];
+    const adv  = () => tokens[pos++];
+    const skip = () => { while(peek().t===TT.NL||peek().t===TT.SEMI) adv(); };
+    const expect = (t, msg) => { if(peek().t!==t) throw new Error(msg+` (got '${peek().v}')`); return adv(); };
+
+    // ── Parse & collect AST stats ──
+    let node_count = 0;
+    const node = (type, data) => { node_count++; return {type,...data}; };
+
+    const parse_program = () => {
+      const stmts = [];
+      skip();
+      while(peek().t !== TT.EOF){ stmts.push(parse_stmt()); skip(); }
+      return node('Program', {stmts});
+    };
+
+    const parse_stmt = () => {
+      skip();
+      const t = peek();
+      if(t.t===TT.LET)    return parse_let();
+      if(t.t===TT.IF)     return parse_if();
+      if(t.t===TT.WHILE)  return parse_while();
+      if(t.t===TT.FOR)    return parse_for();
+      if(t.t===TT.FN)     return parse_fn();
+      if(t.t===TT.RETURN) { adv(); const v=(!([TT.NL,TT.SEMI,TT.EOF,TT.RBRACE].includes(peek().t)))?parse_expr():null; return node('Return',{value:v}); }
+      if(t.t===TT.PRINT)  return parse_print();
+      if(t.t===TT.LBRACE) return parse_block();
+      if(t.t===TT.BREAK)  { adv(); return node('Break',{}); }
+      if(t.t===TT.CONTINUE){ adv(); return node('Continue',{}); }
+      const e = parse_expr();
+      return node('ExprStmt',{expr:e});
+    };
+
+    const parse_let = () => {
+      adv();
+      const name = expect(TT.IDENT,'Expected name').v;
+      let init = null;
+      if(peek().t===TT.ASSIGN){adv(); init=parse_expr();}
+      return node('Let',{name,init});
+    };
+
+    const parse_if = () => {
+      adv(); expect('(','Expected (');
+      const cond = parse_expr(); expect(')','Expected )');
+      const then = parse_stmt();
+      let els = null; skip();
+      if(peek().t===TT.ELSE){adv();skip();els=parse_stmt();}
+      return node('If',{cond,then,els});
+    };
+
+    const parse_while = () => {
+      adv(); expect('(','Expected (');
+      const cond = parse_expr(); expect(')','Expected )');
+      const body = parse_stmt();
+      return node('While',{cond,body});
+    };
+
+    const parse_for = () => {
+      adv(); expect('(','Expected (');
+      let init=null;
+      if(peek().t!==TT.SEMI&&peek().t!==TT.NL){
+        if(peek().t===TT.LET) init=parse_let(); else init=node('ExprStmt',{expr:parse_expr()});
+      }
+      if(peek().t===TT.SEMI||peek().t===TT.NL)adv();
+      let cond=null;
+      if(peek().t!==TT.SEMI&&peek().t!==TT.NL)cond=parse_expr();
+      if(peek().t===TT.SEMI||peek().t===TT.NL)adv();
+      let inc=null;
+      if(peek().t!==')')inc=parse_expr();
+      expect(')','Expected )');
+      const body=parse_stmt();
+      return node('For',{init,cond,inc,body});
+    };
+
+    const parse_fn = () => {
+      adv();
+      const name=expect(TT.IDENT,'Expected fn name').v;
+      expect('(','Expected (');
+      const params=[];
+      if(peek().t!==')'){ params.push(expect(TT.IDENT,'Expected param').v);
+        while(peek().t===','){ adv(); params.push(expect(TT.IDENT,'Expected param').v); } }
+      expect(')','Expected )'); skip();
+      const body=parse_block();
+      return node('Fn',{name,params,body});
+    };
+
+    const parse_print = () => {
+      adv(); expect('(','Expected (');
+      const exprs=[];
+      if(peek().t!==')'){ exprs.push(parse_expr());
+        while(peek().t===','){ adv(); exprs.push(parse_expr()); } }
+      expect(')','Expected )');
+      return node('Print',{exprs});
+    };
+
+    const parse_block = () => {
+      expect('{','Expected {'); const stmts=[]; skip();
+      while(peek().t!=='}'&&peek().t!==TT.EOF){stmts.push(parse_stmt());skip();}
+      expect('}','Expected }');
+      return node('Block',{stmts});
+    };
+
+    const parse_expr   = () => parse_assign();
+    const parse_assign = () => {
+      if(peek().t===TT.IDENT) {
+        const name=peek().v, nxt=peek(1).t;
+        if(nxt===TT.ASSIGN){adv();adv();return node('Assign',{name,value:parse_expr()});}
+        if([TT.PLUS_A,TT.MINUS_A,TT.STAR_A,TT.SLASH_A].includes(nxt)){
+          adv();const op=adv().v;return node('CompAssign',{name,op,value:parse_expr()});
+        }
+      }
+      return parse_or();
+    };
+    const parse_or  = () => { let l=parse_and(); while(peek().t===TT.OR){adv();l=node('Binary',{op:'or',l,r:parse_and()});}return l; };
+    const parse_and = () => { let l=parse_eq();  while(peek().t===TT.AND){adv();l=node('Binary',{op:'and',l,r:parse_eq()});}return l; };
+    const parse_eq  = () => { let l=parse_cmp(); while([TT.EQ,TT.NEQ].includes(peek().t)){const op=adv().v;l=node('Binary',{op,l,r:parse_cmp()});}return l; };
+    const parse_cmp = () => { let l=parse_add(); while([TT.LT,TT.GT,TT.LTE,TT.GTE].includes(peek().t)){const op=adv().v;l=node('Binary',{op,l,r:parse_add()});}return l; };
+    const parse_add = () => { let l=parse_mul(); while([TT.PLUS,TT.MINUS].includes(peek().t)){const op=adv().v;l=node('Binary',{op,l,r:parse_mul()});}return l; };
+    const parse_mul = () => { let l=parse_un();  while([TT.STAR,TT.SLASH,TT.PERCENT].includes(peek().t)){const op=adv().v;l=node('Binary',{op,l,r:parse_un()});}return l; };
+    const parse_un  = () => {
+      if(peek().t===TT.MINUS){adv();return node('Unary',{op:'-',operand:parse_un()});}
+      if(peek().t===TT.NOT){adv();return node('Unary',{op:'not',operand:parse_un()});}
+      if(peek().t===TT.INCR){adv();const n=parse_un();const name=n.name;return node('Assign',{name,value:node('Binary',{op:'+',l:node('Ident',{name}),r:node('Lit',{val:1})})});}
+      if(peek().t===TT.DECR){adv();const n=parse_un();const name=n.name;return node('Assign',{name,value:node('Binary',{op:'-',l:node('Ident',{name}),r:node('Lit',{val:1})})});}
+      return parse_primary();
+    };
+    const parse_primary = () => {
+      const t=peek();
+      if(t.t===TT.NUMBER){adv();return node('Lit',{val:parseInt(t.v)});}
+      if(t.t===TT.FLOAT) {adv();return node('Lit',{val:parseFloat(t.v)});}
+      if(t.t===TT.STRING){adv();return node('Lit',{val:t.v});}
+      if(t.t===TT.TRUE)  {adv();return node('Lit',{val:true});}
+      if(t.t===TT.FALSE) {adv();return node('Lit',{val:false});}
+      if(t.t===TT.NIL)   {adv();return node('Lit',{val:null});}
+      if(t.t===TT.INPUT) {
+        adv(); let prompt=null;
+        if(peek().t==='('){adv();if(peek().t!==')')prompt=parse_expr();expect(')','Expected )');}
+        return node('Input',{prompt});
+      }
+      if(t.t===TT.IDENT){
+        adv();
+        if(peek().t==='('){
+          adv(); const args=[];
+          if(peek().t!==')'){ args.push(parse_expr()); while(peek().t===','){ adv(); args.push(parse_expr()); } }
+          expect(')','Expected )');
+          return node('Call',{name:t.v,args});
+        }
+        if(peek().t===TT.INCR||peek().t===TT.DECR){
+          const op=adv().v;
+          return node('Assign',{name:t.v,value:node('Binary',{op:op==='++' ? '+' : '-',l:node('Ident',{name:t.v}),r:node('Lit',{val:1})})});
+        }
+        return node('Ident',{name:t.v});
+      }
+      if(t.t==='('){adv();const e=parse_expr();expect(')','Expected )');return e;}
+      throw new Error(`Unexpected token '${t.v}' at line ${t.ln}`);
+    };
+
+    const ast = parse_program();
+    this.stats.nodes = node_count;
+    const t2 = performance.now();
+
+    // ── Evaluate ──────────────────────────────
+    const env_stack = [this.globals];
+    const push_env = () => env_stack.push({});
+    const pop_env  = () => env_stack.pop();
+    const get_var  = n => { for(let i=env_stack.length-1;i>=0;i--){ if(n in env_stack[i]) return env_stack[i][n]; } return undefined; };
+    const set_var  = (n,v) => { for(let i=env_stack.length-1;i>=0;i--){ if(n in env_stack[i]){ env_stack[i][n]=v; return; } } this.globals[n]=v; };
+    const def_var  = (n,v) => { env_stack[env_stack.length-1][n]=v; };
+
+    const to_str = v => {
+      if(v===null||v===undefined) return 'nil';
+      if(typeof v==='boolean') return v?'true':'false';
+      if(typeof v==='number') {
+        if(Number.isInteger(v)) return String(v);
+        let s=v.toPrecision(7).replace(/0+$/,'');
+        if(s.endsWith('.'))s+='0';
+        return s;
+      }
+      if(typeof v==='string') return v;
+      if(typeof v==='function') return '<fn>';
+      return String(v);
+    };
+    const is_truthy = v => v!==null&&v!==undefined&&v!==false&&v!==0&&v!=='';
+
+    const builtins = {
+      sqrt:([x])=>Math.sqrt(Number(x)), abs:([x])=>Math.abs(Number(x)),
+      pow:([a,b])=>Math.pow(Number(a),Number(b)), floor:([x])=>Math.floor(Number(x)),
+      ceil:([x])=>Math.ceil(Number(x)), round:([x])=>Math.round(Number(x)),
+      max:([a,b])=>a>b?a:b, min:([a,b])=>a<b?a:b,
+      str:([x])=>to_str(x), int:([x])=>parseInt(x)||0, float:([x])=>parseFloat(x)||0,
+      bool:([x])=>is_truthy(x), len:([x])=>typeof x==='string'?x.length:0,
+      type:([x])=>x===null?'nil':typeof x==='number'?(Number.isInteger(x)?'int':'float'):typeof x,
+      chr:([n])=>String.fromCharCode(n), ord:([s])=>s.charCodeAt(0),
+    };
+
+    // Bytecode simulation log
+    const bc = this.bytecode_log = [];
+    const sl = this.stack_log = [];
+    let bc_ip = 0;
+    const emit_bc = (op, arg='') => bc.push({op, arg, ip: bc_ip++});
+    let sim_stack = [];
+    const sim_push = v => { sim_stack.push(v); if(sim_stack.length > this.stats.stack_peak) this.stats.stack_peak = sim_stack.length; };
+    const sim_pop  = () => sim_stack.pop();
+
+    const eval_node = (n) => {
+      if(!n) return null;
+      this.stats.instructions++;
+
+      switch(n.type) {
+        case 'Program': { for(const s of n.stmts){ eval_node(s); if(this.returning)break; } return null; }
+        case 'Block': {
+          push_env();
+          for(const s of n.stmts){
+            eval_node(s);
+            if(this.returning||this.break_signal||this.continue_signal)break;
+          }
+          pop_env();
+          return null;
+        }
+        case 'Lit': {
+          emit_bc(typeof n.val==='number'?(Number.isInteger(n.val)?'PUSH_INT':'PUSH_FLOAT'):
+                  typeof n.val==='boolean'?'PUSH_BOOL':n.val===null?'PUSH_NIL':'PUSH_STRING',
+                  to_str(n.val));
+          sim_push(n.val);
+          return n.val;
+        }
+        case 'Ident': {
+          const v = get_var(n.name);
+          emit_bc('LOAD_VAR', n.name);
+          sim_push(v);
+          return v !== undefined ? v : null;
+        }
+        case 'Binary': {
+          if(n.op==='and'){
+            const l=eval_node(n.l);
+            emit_bc('JUMP_IF_FALSE','short-circuit');
+            if(!is_truthy(l)){sim_pop();return false;}
+            sim_pop(); const r=eval_node(n.r); return is_truthy(r);
+          }
+          if(n.op==='or'){
+            const l=eval_node(n.l);
+            emit_bc('JUMP_IF_TRUE','short-circuit');
+            if(is_truthy(l)){return l;}
+            sim_pop(); return eval_node(n.r);
+          }
+          const a=eval_node(n.l), b=eval_node(n.r);
+          sim_pop(); sim_pop();
+          let res;
+          switch(n.op){
+            case '+': res=(typeof a==='string'||typeof b==='string')?to_str(a)+to_str(b):a+b; emit_bc('ADD'); break;
+            case '-': res=a-b; emit_bc('SUB'); break;
+            case '*': res=(typeof a==='string'&&typeof b==='number')?a.repeat(b):a*b; emit_bc('MUL'); break;
+            case '/': if(b===0)throw new Error('Division by zero'); res=Math.trunc(a/b)||a/b; emit_bc('DIV'); break;
+            case '%': res=a%b; emit_bc('MOD'); break;
+            case '==': res=a===b; emit_bc('EQ'); break;
+            case '!=': res=a!==b; emit_bc('NEQ'); break;
+            case '<':  res=a<b; emit_bc('LT'); break;
+            case '>':  res=a>b; emit_bc('GT'); break;
+            case '<=': res=a<=b; emit_bc('LTE'); break;
+            case '>=': res=a>=b; emit_bc('GTE'); break;
+          }
+          sim_push(res);
+          return res;
+        }
+        case 'Unary': {
+          const v=eval_node(n.operand); sim_pop();
+          if(n.op==='-'){emit_bc('NEG');sim_push(-v);return -v;}
+          emit_bc('NOT'); sim_push(!is_truthy(v)); return !is_truthy(v);
+        }
+        case 'Assign': {
+          const v=eval_node(n.value);
+          set_var(n.name,v); emit_bc('STORE_VAR',n.name); return v;
+        }
+        case 'CompAssign': {
+          const cur=get_var(n.name)||0, v=eval_node(n.value);
+          let res;
+          switch(n.op){case'+=':res=cur+v;break;case'-=':res=cur-v;break;case'*=':res=cur*v;break;case'/=':res=Math.trunc(cur/v);break;}
+          set_var(n.name,res); emit_bc('STORE_VAR',n.name); return res;
+        }
+        case 'Let': {
+          const v=n.init?eval_node(n.init):null;
+          def_var(n.name,v); emit_bc('DEFINE_VAR',n.name); return null;
+        }
+        case 'ExprStmt': { const v=eval_node(n.expr); sim_pop(); emit_bc('POP'); return null; }
+        case 'Print': {
+          for(const e of n.exprs){ const v=eval_node(e); sim_pop(); this.out(to_str(v)); emit_bc('PRINT'); }
+          return null;
+        }
+        case 'If': {
+          const cond=eval_node(n.cond);
+          emit_bc('JUMP_IF_FALSE','else');
+          sim_pop();
+          if(is_truthy(cond)){ eval_node(n.then); }
+          else if(n.els){ emit_bc('JUMP','end'); eval_node(n.els); }
+          return null;
+        }
+        case 'While': {
+          emit_bc('LOOP_START');
+          while(true){
+            const cond=eval_node(n.cond); sim_pop();
+            emit_bc('JUMP_IF_FALSE','end');
+            if(!is_truthy(cond)) break;
+            eval_node(n.body);
+            if(this.returning) break;
+            if(this.break_signal){this.break_signal=false;break;}
+            if(this.continue_signal){this.continue_signal=false;continue;}
+            emit_bc('JUMP','loop_start');
+          }
+          return null;
+        }
+        case 'For': {
+          push_env();
+          if(n.init) eval_node(n.init);
+          emit_bc('LOOP_START');
+          while(true){
+            if(n.cond){ const c=eval_node(n.cond); sim_pop(); emit_bc('JUMP_IF_FALSE','end'); if(!is_truthy(c)) break; }
+            eval_node(n.body);
+            if(this.returning) break;
+            if(this.break_signal){this.break_signal=false;break;}
+            if(this.continue_signal){this.continue_signal=false;}
+            if(n.inc){ eval_node(n.inc); sim_pop(); }
+            emit_bc('JUMP','loop_start');
+          }
+          pop_env();
+          return null;
+        }
+        case 'Fn': {
+          emit_bc('MAKE_FUNC', n.name);
+          this.fns[n.name]=n; this.globals[n.name]=n;
+          def_var(n.name, n);
+          return null;
+        }
+        case 'Call': {
+          this.stats.calls++;
+          if(n.name in builtins){
+            const args=n.args.map(a=>eval_node(a));
+            n.args.forEach(()=>sim_pop());
+            emit_bc('CALL', n.name+'/native');
+            const result=builtins[n.name](args);
+            sim_push(result);
+            return result;
+          }
+          const fn=this.fns[n.name]||get_var(n.name);
+          if(!fn||typeof fn!=='object'||fn.type!=='Fn')
+            throw new Error(`'${n.name}' is not a function`);
+          const args=n.args.map(a=>eval_node(a));
+          n.args.forEach(()=>sim_pop());
+          emit_bc('CALL', n.name);
+          push_env();
+          fn.params.forEach((p,i)=>def_var(p,args[i]));
+          const saved_returning=this.returning, saved_retval=this.return_val;
+          this.returning=false; this.return_val=null;
+          eval_node(fn.body);
+          const ret=this.return_val;
+          this.returning=false; this.return_val=saved_retval;
+          pop_env();
+          emit_bc('RETURN');
+          sim_push(ret);
+          return ret;
+        }
+        case 'Return': {
+          this.return_val=n.value?eval_node(n.value):null;
+          if(n.value)sim_pop();
+          this.returning=true; emit_bc('RETURN');
+          return null;
+        }
+        case 'Break':    { this.break_signal=true; emit_bc('JUMP','break'); return null; }
+        case 'Continue': { this.continue_signal=true; emit_bc('JUMP','continue'); return null; }
+        case 'Input': {
+          const p=n.prompt?to_str(eval_node(n.prompt)):'';
+          if(n.prompt)sim_pop();
+          const val=prompt(p||'Input:');
+          const num=Number(val);
+          emit_bc('INPUT');
+          sim_push(isNaN(num)?val:num);
+          return isNaN(num)?(val||''):num;
+        }
+        default: return null;
+      }
+    };
+
+    eval_node(ast);
+    const t3 = performance.now();
+    this.compile_ms = (t2-t0).toFixed(2);
+    this.exec_ms = (t3-t2).toFixed(2);
+    this.final_stack = [...sim_stack];
+  }
+}
+
+// ─────────────────────────────────────────────
+//  UI Layer
+// ─────────────────────────────────────────────
+const editor = document.getElementById('editor');
+const lineNums = document.getElementById('lineNums');
+const highlight = document.getElementById('highlight');
+const terminal = document.getElementById('terminal');
+
+// ── Syntax highlighter ────────────────────────
+const KEYWORDS_SET = new Set(['let','if','else','while','for','fn','return','print',
+                               'input','true','false','nil','and','or','not','break','continue']);
+
+function highlightCode(code) {
+  let out = '';
+  let i = 0;
+  const peek = (o=0) => i+o < code.length ? code[i+o] : '';
+  while(i < code.length) {
+    // Comment
+    if(code[i]==='#'){
+      let c=''; while(i<code.length&&code[i]!=='\n') c+=code[i++];
+      out+=`<span class="cmt">${esc(c)}</span>`; continue;
+    }
+    if(code[i]==='/'&&peek(1)==='*'){
+      let c=''; while(i<code.length){c+=code[i];if(code[i]==='/'&&c.length>2&&c[c.length-2]==='*'){i++;break;}i++;}
+      out+=`<span class="cmt">${esc(c)}</span>`; continue;
+    }
+    // String
+    if(code[i]==='"'||code[i]==="'"){
+      const q=code[i]; let s=code[i++];
+      while(i<code.length&&code[i]!==q){if(code[i]==='\\')s+=code[i++];s+=code[i++];}
+      if(i<code.length)s+=code[i++];
+      out+=`<span class="str">${esc(s)}</span>`; continue;
+    }
+    // Number
+    if(/\d/.test(code[i])){
+      let n=''; let f=false;
+      while(i<code.length&&(/\d/.test(code[i])||code[i]==='_'||code[i]==='.'||code[i]==='e')){
+        if(code[i]==='.'||code[i]==='e')f=true; n+=code[i++];
+      }
+      out+=`<span class="num">${esc(n)}</span>`; continue;
+    }
+    // Identifier/keyword
+    if(/[a-zA-Z_]/.test(code[i])){
+      let id=''; while(i<code.length&&/[a-zA-Z0-9_]/.test(code[i]))id+=code[i++];
+      if(KEYWORDS_SET.has(id)) out+=`<span class="kw">${esc(id)}</span>`;
+      else if(BUILTINS.has(id)) out+=`<span class="builtin">${esc(id)}</span>`;
+      else out+=`<span class="ident">${esc(id)}</span>`;
+      continue;
+    }
+    // Operator
+    const two=code[i]+peek(1);
+    if(['==','!=','<=','>=','++','--','+=','-=','*=','/='].includes(two)){
+      out+=`<span class="op">${esc(two)}</span>`; i+=2; continue;
+    }
+    if('+-*/%=<>!'.includes(code[i])){
+      out+=`<span class="op">${esc(code[i])}</span>`; i++; continue;
+    }
+    out+=esc(code[i++]);
+  }
+  return out;
+}
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function updateHighlight(){
+  const code = editor.value;
+  highlight.innerHTML = highlightCode(code) + '\n';
+  const lines = code.split('\n').length;
+  lineNums.innerHTML = Array.from({length:lines},(_,i)=>i+1).join('\n');
+  // Sync scroll
+  highlight.scrollTop = editor.scrollTop;
+  highlight.scrollLeft = editor.scrollLeft;
+}
+
+editor.addEventListener('input', updateHighlight);
+editor.addEventListener('scroll', () => {
+  highlight.scrollTop = editor.scrollTop;
+  highlight.scrollLeft = editor.scrollLeft;
+  lineNums.scrollTop = editor.scrollTop;
+});
+editor.addEventListener('keydown', e => {
+  if(e.key==='Tab'){
+    e.preventDefault();
+    const s=editor.selectionStart, end=editor.selectionEnd;
+    editor.value=editor.value.substring(0,s)+'    '+editor.value.substring(end);
+    editor.selectionStart=editor.selectionEnd=s+4;
+    updateHighlight();
+  }
+  if(e.ctrlKey&&e.key==='Enter') runCode();
+});
+
+// ── Panel switching ────────────────────────────
+function switchPanel(name){
+  document.querySelectorAll('.panel-tab').forEach((t,i)=>{
+    const names=['output','stack','bytecode','stats'];
+    t.classList.toggle('active', names[i]===name);
+  });
+  document.querySelectorAll('.panel-content').forEach(p=>{
+    p.classList.toggle('active', p.id==='panel-'+name);
+  });
+}
+
+// ── Output ────────────────────────────────────
+function addOutput(text, cls='out-normal'){
+  const line = document.createElement('div');
+  line.className = 'terminal-line';
+  line.innerHTML = `<span class="terminal-prompt">›</span><span class="${cls}">${esc(text)}</span>`;
+  terminal.appendChild(line);
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function clearOutput(){
+  terminal.innerHTML = `<div style="color:var(--muted); font-size:11px; padding-bottom:12px; border-bottom:1px solid var(--border); margin-bottom:12px;">CVM++ Interactive — Press ▶ Run to execute</div>`;
+  document.getElementById('stackViz').innerHTML = '<div class="stack-empty">Run code to see the execution stack</div>';
+  document.getElementById('bytecodeView').innerHTML = '<div style="color:var(--muted); font-size:11px;">Run code to see compiled bytecode</div>';
+  document.getElementById('stat-instructions').textContent = '—';
+  document.getElementById('stat-stack').textContent = '—';
+  document.getElementById('stat-calls').textContent = '—';
+  document.getElementById('stat-compile').innerHTML = '—<span class="stat-unit">ms</span>';
+  document.getElementById('stat-exec').innerHTML = '—<span class="stat-unit">ms</span>';
+  document.getElementById('stat-tokens').textContent = '—';
+  document.getElementById('stat-nodes').textContent = '—';
+}
+
+// ── Stack visualizer ────────────────────────────
+function typeClass(v){
+  if(v===null||v===undefined) return 'type-nil';
+  if(typeof v==='boolean') return 'type-bool';
+  if(typeof v==='number') return Number.isInteger(v)?'type-int':'type-float';
+  if(typeof v==='string'){ if(v.startsWith('__fn__:')) return 'type-fn'; return 'type-string'; }
+  if(typeof v==='object') return 'type-fn';
+  return 'type-nil';
+}
+function typeName(v){
+  if(v===null||v===undefined) return 'nil';
+  if(typeof v==='boolean') return 'bool';
+  if(typeof v==='number') return Number.isInteger(v)?'int':'float';
+  if(typeof v==='string'&&v.startsWith('__fn__:')) return 'fn';
+  if(typeof v==='object') return 'fn';
+  return 'str';
+}
+
+function renderStack(stack, globals){
+  const sv = document.getElementById('stackViz');
+  sv.innerHTML='';
+
+  if(stack && stack.length>0){
+    const frame = document.createElement('div');
+    frame.className='stack-frame';
+    frame.innerHTML='<div class="stack-frame-title">Execution Stack</div>';
+    [...stack].reverse().forEach((v,i)=>{
+      const cell=document.createElement('div');
+      cell.className='stack-cell';
+      cell.innerHTML=`<span class="stack-idx">${stack.length-1-i}</span>
+        <span class="stack-type ${typeClass(v)}">${typeName(v)}</span>
+        <span class="stack-val">${esc(String(v===null?'nil':v===true?'true':v===false?'false':v))}</span>`;
+      frame.appendChild(cell);
+    });
+    sv.appendChild(frame);
+  }
+
+  const keys=Object.keys(globals).filter(k=>typeof globals[k]!=='object'||globals[k]===null);
+  if(keys.length>0){
+    const frame=document.createElement('div');
+    frame.className='stack-frame';
+    frame.innerHTML='<div class="stack-frame-title">Globals</div>';
+    keys.forEach(k=>{
+      const v=globals[k];
+      const cell=document.createElement('div');
+      cell.className='stack-cell';
+      cell.innerHTML=`<span class="stack-idx" style="color:var(--muted)">${k}</span>
+        <span class="stack-type ${typeClass(v)}">${typeName(v)}</span>
+        <span class="stack-val">${esc(String(v===null?'nil':v===true?'true':v===false?'false':v))}</span>`;
+      frame.appendChild(cell);
+    });
+    sv.appendChild(frame);
+  }
+
+  if((!stack||stack.length===0)&&keys.length===0)
+    sv.innerHTML='<div class="stack-empty">No values on stack</div>';
+}
+
+// ── Bytecode renderer ──────────────────────────
+function renderBytecode(bc){
+  const bv = document.getElementById('bytecodeView');
+  bv.innerHTML='<div class="bc-section">main chunk</div>';
+  bc.forEach(({op,arg,ip})=>{
+    const line=document.createElement('div');
+    line.className='bc-line';
+    line.innerHTML=`<span class="bc-offset">${String(ip).padStart(4,'0')}</span>
+      <span class="bc-op">${op}</span>
+      ${arg?`<span class="bc-arg">${esc(String(arg))}</span>`:''}`;
+    bv.appendChild(line);
+  });
+}
+
+// ── Stats renderer ─────────────────────────────
+function renderStats(interp){
+  document.getElementById('stat-instructions').textContent = interp.stats.instructions.toLocaleString();
+  document.getElementById('stat-stack').textContent = interp.stats.stack_peak;
+  document.getElementById('stat-stack-bar').style.width = Math.min(interp.stats.stack_peak*10,100)+'%';
+  document.getElementById('stat-calls').textContent = interp.stats.calls;
+  document.getElementById('stat-compile').innerHTML = interp.compile_ms+'<span class="stat-unit">ms</span>';
+  document.getElementById('stat-exec').innerHTML = interp.exec_ms+'<span class="stat-unit">ms</span>';
+  document.getElementById('stat-tokens').textContent = interp.stats.tokens;
+  document.getElementById('stat-nodes').textContent = interp.stats.nodes;
+}
+
+// ── Run ────────────────────────────────────────
+function runCode(){
+  const code = editor.value.trim();
+  if(!code) return;
+
+  const btn=document.getElementById('runBtn');
+  btn.innerHTML='<span class="btn-icon running">◉</span> Running';
+  btn.disabled=true;
+
+  terminal.innerHTML='<div style="color:var(--muted); font-size:11px; margin-bottom:8px;">▶ Executing...</div>';
+
+  setTimeout(()=>{
+    const lines=[];
+    const interp=new CVMInterpreter(v=>lines.push({v,err:false}));
+
+    try{
+      interp.run(code);
+      terminal.innerHTML='<div style="color:var(--muted); font-size:11px; padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid var(--border);">▶ Output</div>';
+      if(lines.length===0) addOutput('(no output)', 'out-dim');
+      else lines.forEach(({v,err})=>addOutput(v,err?'out-error':'out-normal'));
+      addOutput(`\n✓ Completed in ${interp.exec_ms}ms`, 'out-dim');
+    } catch(e){
+      terminal.innerHTML='<div style="color:var(--err); font-size:11px; padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid var(--border);">✗ Error</div>';
+      if(lines.length>0) lines.forEach(({v})=>addOutput(v));
+      addOutput('Error: '+e.message, 'out-error');
+    }
+
+    renderStack(interp.final_stack||[], interp.globals);
+    renderBytecode(interp.bytecode_log.slice(-200));
+    renderStats(interp);
+
+    btn.innerHTML='<span class="btn-icon">▶</span> Run';
+    btn.disabled=false;
+  },10);
+}
+
+// ── Script templates ─────────────────────────────
+const SCRIPTS = {
+  basics: `# ══ CVM++ Basics Demo ══════════════════
+print("═══════════════════════════════")
+print("  CVM++ Hello World Demo")
+print("═══════════════════════════════")
+
+# Variables & Types
+let name = "CVM++"
+let version = 1
+let pi = 3.14159
+let active = true
+
+print("Name    : " + name)
+print("Version : " + str(version))
+print("Pi      : " + str(pi))
+print("Active  : " + str(active))
+
+# Arithmetic
+print("\\n── Arithmetic ──")
+let a = 15
+let b = 4
+print("a + b = " + str(a + b))
+print("a - b = " + str(a - b))
+print("a * b = " + str(a * b))
+print("a / b = " + str(a / b))
+print("a % b = " + str(a % b))
+
+# Strings
+print("\\n── Strings ──")
+print("Hello" + ", " + "World!")
+print("Ha" * 3)
+print("Length: " + str(len("Hello, CVM++!")))`,
+
+  control: `# ══ Control Flow Demo ═════════════════
+# FizzBuzz
+print("── FizzBuzz (1..15) ──")
+let i = 1
+while (i <= 15) {
+    if (i % 15 == 0) { print("FizzBuzz") }
+    else {
+        if (i % 3 == 0) { print("Fizz") }
+        else {
+            if (i % 5 == 0) { print("Buzz") }
+            else { print(i) }
+        }
+    }
+    i += 1
+}
+
+# For loop with sum
+print("\\n── Sum 1..100 ──")
+let sum = 0
+for (let j = 1; j <= 100; j = j + 1) {
+    sum += j
+}
+print("Sum = " + str(sum))
+
+# Break & Continue
+print("\\n── Evens via continue ──")
+let k = 0
+while (k < 10) {
+    k += 1
+    if (k % 2 != 0) { continue }
+    print(k)
+}`,
+
+  functions: `# ══ Functions & Recursion ══════════════
+fn greet(name) {
+    return "Hello, " + name + "!"
+}
+print(greet("World"))
+
+# Fibonacci
+fn fib(n) {
+    if (n <= 1) { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+print("\\n── Fibonacci 0..10 ──")
+for (let i = 0; i <= 10; i = i + 1) {
+    print("fib(" + str(i) + ") = " + str(fib(i)))
+}
+
+# Factorial
+fn fact(n) {
+    if (n <= 1) { return 1 }
+    return n * fact(n - 1)
+}
+print("\\n── Factorials ──")
+for (let i = 0; i <= 8; i = i + 1) {
+    print(str(i) + "! = " + str(fact(i)))
+}
+
+# GCD
+fn gcd(a, b) {
+    while (b != 0) {
+        let t = b
+        b = a % b
+        a = t
+    }
+    return a
+}
+print("\\ngcd(48, 18) = " + str(gcd(48, 18)))`,
+
+  algorithms: `# ══ Algorithms Demo ═══════════════════
+fn is_prime(n) {
+    if (n < 2) { return false }
+    if (n == 2) { return true }
+    if (n % 2 == 0) { return false }
+    let d = 3
+    while (d * d <= n) {
+        if (n % d == 0) { return false }
+        d += 2
+    }
+    return true
+}
+
+print("── Primes up to 60 ──")
+let primes = ""
+let count = 0
+for (let n = 2; n <= 60; n = n + 1) {
+    if (is_prime(n)) {
+        if (count > 0) { primes = primes + ", " }
+        primes = primes + str(n)
+        count += 1
+    }
+}
+print(primes)
+print("Total: " + str(count))
+
+# Collatz
+fn collatz(n) {
+    let steps = 0
+    while (n != 1) {
+        if (n % 2 == 0) { n = n / 2 }
+        else { n = n * 3 + 1 }
+        steps += 1
+    }
+    return steps
+}
+print("\\n── Collatz ──")
+print("collatz(27) = " + str(collatz(27)) + " steps")
+print("collatz(100) = " + str(collatz(100)) + " steps")`,
+
+  stdlib: `# ══ Standard Library ══════════════════
+print("── Math ──")
+print("sqrt(144) = " + str(sqrt(144.0)))
+print("abs(-42)  = " + str(abs(-42)))
+print("pow(2,10) = " + str(pow(2.0, 10.0)))
+print("floor(3.9)= " + str(floor(3.9)))
+print("ceil(3.1) = " + str(ceil(3.1)))
+print("max(5,12) = " + str(max(5, 12)))
+print("min(5,12) = " + str(min(5, 12)))
+
+print("\\n── Types ──")
+print("type(42)   = " + type(42))
+print("type(3.14) = " + type(3.14))
+print("type(true) = " + type(true))
+print("type(\\\"hi\\\") = " + type("hi"))
+print("type(nil)  = " + type(nil))
+
+print("\\n── Conversions ──")
+print("str(42)       = " + str(42))
+print("int(\\\"123\\\")   = " + str(int("123")))
+print("float(\\\"3.5\\\") = " + str(float("3.5")))
+print("bool(0)       = " + str(bool(0)))
+print("len(\\\"hello\\\") = " + str(len("hello")))`,
+};
+
+function loadScript(name){
+  editor.value = SCRIPTS[name] || '';
+  updateHighlight();
+  document.querySelectorAll('.file-item').forEach((el,i)=>{
+    el.classList.toggle('active', ['basics','control','functions','algorithms','stdlib'][i]===name);
+  });
+}
+
+// ── Init ──────────────────────────────────────
+loadScript('basics');
+
+// Keyboard shortcut hint
+document.addEventListener('keydown', e=>{
+  if(e.ctrlKey&&e.key==='Enter'){ e.preventDefault(); runCode(); }
+});
+</script>
+</body>
+</html>
