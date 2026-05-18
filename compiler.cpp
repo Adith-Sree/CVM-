@@ -88,10 +88,8 @@ Compiler::Result Compiler::compile(ASTNode& ast) {
     result_ = Result{};
     result_.main_chunk.name = "main";
     current_chunk_ = &result_.main_chunk;
-    push_scope();
     ast.accept(*this);
     emit(Opcode::HALT);
-    pop_scope();
     return std::move(result_);
 }
 
@@ -167,7 +165,6 @@ void Compiler::visit(AssignExpr& n) {
     current_line_ = n.line;
     n.value->accept(*this);
     emit_store(n.name, n.line);
-    emit_load(n.name, n.line);
 }
 
 void Compiler::visit(CompoundAssignExpr& n) {
@@ -182,7 +179,6 @@ void Compiler::visit(CompoundAssignExpr& n) {
     if (it != ops.end()) emit(it->second);
     else throw CompileError("Unknown compound op: " + n.op, n.line);
     emit_store(n.name, n.line);
-    emit_load(n.name, n.line);
 }
 
 void Compiler::visit(CallExpr& n) {
@@ -218,6 +214,7 @@ void Compiler::visit(LetStmt& n) {
         emit(Opcode::STORE_GLOBAL);
         uint16_t idx = current_chunk_->add_string(n.name);
         current_chunk_->write_uint16(idx, n.line);
+        emit(Opcode::POP);
     }
 }
 

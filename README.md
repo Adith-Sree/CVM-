@@ -72,15 +72,15 @@ make -j4
 
 ### Direct g++ (fastest)
 ```bash
-g++ -std=c++17 -O2 -Wall -Iinclude \
-    src/lexer.cpp src/parser.cpp src/compiler.cpp src/vm.cpp src/main.cpp \
+g++ -std=c++17 -O2 -Wall \
+    lexer.cpp parser.cpp compiler.cpp vm.cpp main.cpp \
     -o cvm
 ```
 
 ### Build & run tests
 ```bash
-g++ -std=c++17 -O2 -Iinclude \
-    src/lexer.cpp src/parser.cpp src/compiler.cpp src/vm.cpp tests/test_runner.cpp \
+g++ -std=c++17 -O2 \
+    lexer.cpp parser.cpp compiler.cpp vm.cpp test_runner.cpp \
     -o cvm_test && ./cvm_test
 ```
 
