@@ -498,5 +498,5 @@ for (let n = 2; n <= 50; n = n + 1) {
 
 ---
 
-*Built for the CVM++ project — mentored by Raman (7977779056)*
-# CVM-
+*Built for the CVM++ project — mentored by Raman*
+# CVM++
